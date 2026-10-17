@@ -30,7 +30,7 @@ except Exception as e:
     HAS_BACKEND_MODULES = False
 
 # Configuration
-API_BASE_URL = st.sidebar.text_input("FastAPI Backend URL", value="http://localhost:8000")
+API_BASE_URL = st.sidebar.text_input("FastAPI Backend URL", value="https://pulsepay-backend-po8g.onrender.com")
 
 # Page Config
 st.set_page_config(
