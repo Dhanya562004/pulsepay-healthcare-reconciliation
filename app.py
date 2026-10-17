@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -155,7 +156,11 @@ def check_fastapi_connection():
 IS_API_CONNECTED = check_fastapi_connection()
 
 # Sidebar Setup
-st.sidebar.image("https://img.icons8.com/isometric-line/96/health-calendar.png", width=64)
+logo_path = "assets/logo.png"
+if os.path.exists(logo_path):
+    st.sidebar.image(logo_path, width=64)
+else:
+    st.sidebar.markdown("## 🩺")
 st.sidebar.title("PulsePay Console")
 st.sidebar.caption("Healthcare Billing & Reconciliation")
 
@@ -181,14 +186,15 @@ st.sidebar.subheader("Quick Actions")
 if st.sidebar.button("🔄 Seed / Reset Dataset", use_container_width=True):
     if IS_API_CONNECTED:
         r = requests.post(f"{API_BASE_URL}/seed?force=true")
-        st.sidebar.toast("Database seeded via REST API!", icon="✅")
+        st.toast("Database seeded via REST API!", icon="✅")
     elif HAS_BACKEND_MODULES:
         db = SessionLocal()
         try:
             seed_sample_data(db, force=True)
-            st.sidebar.toast("Database seeded in direct DB mode!", icon="✅")
+            st.toast("Database seeded in direct DB mode!", icon="✅")
         finally:
             db.close()
+    time.sleep(0.5)
     st.rerun()
 
 # -------------------------------------------------------------------
