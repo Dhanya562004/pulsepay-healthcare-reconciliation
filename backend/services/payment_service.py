@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from backend.models.invoice import Invoice
 from backend.models.payment import Payment
+from backend.models.webhook import WebhookEvent
 from backend.schemas.payment_schema import PaymentCreate
 from backend.services.audit_service import AuditService
 from backend.utils.logger import logger
@@ -71,6 +72,60 @@ class PaymentService:
     def get_payment_by_id(db: Session, payment_id: str) -> Optional[Payment]:
         """Fetch payment record by UUID."""
         return db.query(Payment).filter(Payment.id == payment_id).first()
+
+    @staticmethod
+    def get_payments(
+        db: Session,
+        limit: int = 20,
+        offset: int = 0,
+        status: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Fetch paginated payments list with optional status filtering."""
+        query = db.query(Payment)
+        if status:
+            query = query.filter(Payment.status == status.upper())
+
+        total = query.count()
+        payments = (
+            query.order_by(Payment.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+        data = [p.to_dict() for p in payments]
+        has_more = (offset + len(data)) < total
+
+        return {
+            "data": data,
+            "pagination": {
+                "limit": limit,
+                "offset": offset,
+                "total": total,
+                "hasMore": has_more
+            }
+        }
+
+    @staticmethod
+    def get_payment_detail(db: Session, payment_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch single payment detail with related webhook event statuses."""
+        payment = db.query(Payment).filter(Payment.id == payment_id).first()
+        if not payment:
+            return None
+
+        events = (
+            db.query(WebhookEvent)
+            .filter(WebhookEvent.payment_id == payment_id)
+            .order_by(WebhookEvent.processed_at.asc())
+            .all()
+        )
+        webhook_event_statuses = [e.processing_status for e in events]
+        webhook_events = [e.to_dict() for e in events]
+
+        detail = payment.to_dict()
+        detail["webhook_event_statuses"] = webhook_event_statuses
+        detail["webhook_events"] = webhook_events
+        return detail
 
     @staticmethod
     def retry_payment(db: Session, payment_id: str, force_success: bool = True) -> Dict[str, Any]:

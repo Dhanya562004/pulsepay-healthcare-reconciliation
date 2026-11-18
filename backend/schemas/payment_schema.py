@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Union
+from typing import Optional, Union, List, Dict, Any
 from datetime import datetime
 
 class PaymentCreate(BaseModel):
@@ -21,6 +21,20 @@ class PaymentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class PaginationMetadata(BaseModel):
+    limit: int
+    offset: int
+    total: int
+    hasMore: bool
+
+class PaginatedPaymentResponse(BaseModel):
+    data: List[PaymentResponse]
+    pagination: PaginationMetadata
+
+class PaymentDetailResponse(PaymentResponse):
+    webhook_event_statuses: List[str] = []
+    webhook_events: List[Dict[str, Any]] = []
 
 class PaymentRetryRequest(BaseModel):
     payment_id: str = Field(..., description="UUID of the failed payment to retry")
