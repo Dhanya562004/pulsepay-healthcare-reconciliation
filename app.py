@@ -32,6 +32,22 @@ except Exception as e:
 # Configuration
 API_BASE_URL = st.sidebar.text_input("FastAPI Backend URL", value="https://pulsepay-backend-po8g.onrender.com")
 
+# API Key Authentication (reads from environment or Streamlit secrets)
+DEFAULT_API_KEY = os.getenv("API_KEY", "")
+if not DEFAULT_API_KEY:
+    try:
+        DEFAULT_API_KEY = st.secrets.get("API_KEY", "")
+    except Exception:
+        pass
+
+API_KEY = st.sidebar.text_input("API Key (X-Api-Key)", value=DEFAULT_API_KEY, type="password")
+
+def get_api_headers():
+    headers = {}
+    if API_KEY:
+        headers["X-Api-Key"] = API_KEY
+    return headers
+
 # Page Config
 st.set_page_config(
     page_title="PulsePay — Healthcare Reconciliation Engine",
@@ -185,7 +201,7 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("Quick Actions")
 if st.sidebar.button("🔄 Seed / Reset Dataset", use_container_width=True):
     if IS_API_CONNECTED:
-        r = requests.post(f"{API_BASE_URL}/seed?force=true")
+        r = requests.post(f"{API_BASE_URL}/seed?force=true", headers=get_api_headers())
         st.toast("Database seeded via REST API!", icon="✅")
     elif HAS_BACKEND_MODULES:
         db = SessionLocal()
@@ -202,7 +218,7 @@ if st.sidebar.button("🔄 Seed / Reset Dataset", use_container_width=True):
 # -------------------------------------------------------------------
 def get_metrics_data():
     if IS_API_CONNECTED:
-        res = requests.get(f"{API_BASE_URL}/metrics").json()
+        res = requests.get(f"{API_BASE_URL}/metrics", headers=get_api_headers()).json()
         return res
     elif HAS_BACKEND_MODULES:
         db = SessionLocal()
@@ -217,7 +233,7 @@ def get_invoices_list(status_filter=None):
         params = {}
         if status_filter and status_filter != "ALL":
             params["status"] = status_filter
-        res = requests.get(f"{API_BASE_URL}/invoices", params=params).json()
+        res = requests.get(f"{API_BASE_URL}/invoices", params=params, headers=get_api_headers()).json()
         return res
     elif HAS_BACKEND_MODULES:
         db = SessionLocal()
@@ -369,7 +385,7 @@ elif nav_selection == "📋 Invoices & Billing":
                     "amount": amount
                 }
                 if IS_API_CONNECTED:
-                    res = requests.post(f"{API_BASE_URL}/invoices", json=payload)
+                    res = requests.post(f"{API_BASE_URL}/invoices", json=payload, headers=get_api_headers())
                     if res.status_code == 201:
                         st.success(f"Invoice created successfully! ID: `{res.json()['id']}`")
                         st.rerun()
@@ -413,7 +429,7 @@ elif nav_selection == "💳 Payment Gateway":
                     "simulate_failure": simulate_failure
                 }
                 if IS_API_CONNECTED:
-                    res = requests.post(f"{API_BASE_URL}/payments/create", json=payload)
+                    res = requests.post(f"{API_BASE_URL}/payments/create", json=payload, headers=get_api_headers())
                     if res.status_code == 201:
                         p_data = res.json()
                         st.success(f"Payment {p_data['status']}! Ref: `{p_data['external_reference_id']}`")
@@ -436,7 +452,7 @@ elif nav_selection == "💳 Payment Gateway":
 
         if st.button("🔄 Bulk Retry All Failed Payments", use_container_width=True):
             if IS_API_CONNECTED:
-                res = requests.post(f"{API_BASE_URL}/payments/retry-all").json()
+                res = requests.post(f"{API_BASE_URL}/payments/retry-all", headers=get_api_headers()).json()
                 st.success(f"Bulk retry completed! Retried: {res['total_retried']} | Succeeded: {res['succeeded']}")
                 st.rerun()
             elif HAS_BACKEND_MODULES:
@@ -452,26 +468,30 @@ elif nav_selection == "💳 Payment Gateway":
 # 4. WEBHOOK SIMULATOR LAB
 # ===================================================================
 elif nav_selection == "🧪 Webhook Simulator Lab":
-    st.title("🧪 Production Webhook Testing Lab")
+    st.title("🧪 Webhook Testing Lab")
     st.markdown("""
-    Test real-world webhook edge cases: **Idempotency (Duplicate event_id)**, **Out-of-Order / Delayed Events**, and **Unknown Payment IDs**.
+    Test simulated webhook edge cases: **Idempotency (Duplicate event_id)**, **Out-of-Order / Delayed Events**, and **Unknown Payment IDs**.
     """)
 
     # Get payments list for dropdown
-    all_invoices = get_invoices_list("ALL")
     payments_list = []
     if IS_API_CONNECTED:
-        # fetch payments via invoice detail or audit
-        for inv in all_invoices:
-            d = requests.get(f"{API_BASE_URL}/invoices/{inv['id']}").json()
-            payments_list.extend(d.get("payments", []))
+        try:
+            p_res = requests.get(f"{API_BASE_URL}/payments?limit=100", headers=get_api_headers())
+            if p_res.status_code == 200:
+                payments_list = p_res.json().get("data", [])
+        except Exception:
+            payments_list = []
+        if not payments_list:
+            all_invoices = get_invoices_list("ALL")
+            for inv in all_invoices:
+                d = requests.get(f"{API_BASE_URL}/invoices/{inv['id']}", headers=get_api_headers()).json()
+                payments_list.extend(d.get("payments", []))
     elif HAS_BACKEND_MODULES:
         db = SessionLocal()
         try:
-            for inv in all_invoices:
-                d = InvoiceService.get_invoice_detail(db, inv['id'])
-                if d:
-                    payments_list.extend(d.get("payments", []))
+            p_res = PaymentService.get_payments(db, limit=100)
+            payments_list = p_res.get("data", [])
         finally:
             db.close()
 
@@ -517,7 +537,7 @@ elif nav_selection == "🧪 Webhook Simulator Lab":
             }
             start_t = time.time()
             if IS_API_CONNECTED:
-                res = requests.post(f"{API_BASE_URL}/webhook/payment", json=payload)
+                res = requests.post(f"{API_BASE_URL}/webhook/payment", json=payload, headers=get_api_headers())
                 resp_json = res.json()
             elif HAS_BACKEND_MODULES:
                 db = SessionLocal()
@@ -537,7 +557,7 @@ elif nav_selection == "🧪 Webhook Simulator Lab":
     with c2:
         st.subheader("Webhook Event Ingestion Log")
         if IS_API_CONNECTED:
-            history = requests.get(f"{API_BASE_URL}/webhook/history").json()
+            history = requests.get(f"{API_BASE_URL}/webhook/history", headers=get_api_headers()).json()
         elif HAS_BACKEND_MODULES:
             db = SessionLocal()
             try:
@@ -570,7 +590,7 @@ elif nav_selection == "🔍 Reconciliation Engine":
 
     report = None
     if IS_API_CONNECTED:
-        report = requests.get(f"{API_BASE_URL}/reconcile").json()
+        report = requests.get(f"{API_BASE_URL}/reconcile", headers=get_api_headers()).json()
     elif HAS_BACKEND_MODULES:
         db = SessionLocal()
         try:
@@ -600,7 +620,10 @@ elif nav_selection == "🔍 Reconciliation Engine":
 
                     if st.button(f"🛠️ Auto-Resolve Mismatch #{idx+1}", key=f"fix_{idx}"):
                         if IS_API_CONNECTED:
-                            r = requests.post(f"{API_BASE_URL}/reconcile/resolve?invoice_id={m['invoice_id']}&mismatch_type={m['mismatch_type']}").json()
+                            r = requests.post(
+                                f"{API_BASE_URL}/reconcile/resolve?invoice_id={m['invoice_id']}&mismatch_type={m['mismatch_type']}",
+                                headers=get_api_headers()
+                            ).json()
                             st.success(f"Resolved! {r.get('resolution_notes')}")
                             st.rerun()
                         elif HAS_BACKEND_MODULES:
@@ -625,7 +648,7 @@ elif nav_selection == "🛰️ Observability & Audits":
     with t1:
         st.subheader("Immutable System Audit Trail")
         if IS_API_CONNECTED:
-            logs = requests.get(f"{API_BASE_URL}/audit-logs").json()
+            logs = requests.get(f"{API_BASE_URL}/audit-logs", headers=get_api_headers()).json()
         elif HAS_BACKEND_MODULES:
             db = SessionLocal()
             try:
