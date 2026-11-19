@@ -91,4 +91,23 @@
 5. `npm run test` (Vitest) attempted to execute Playwright test file `web/e2e/payments.spec.ts` because default Vitest matchers include `**/*.spec.ts`.
    - *Correction*: Added `exclude: [...configDefaults.exclude, "e2e/**"]` in `web/vitest.config.ts`.
 
+---
+
+## Phase 4: CI/CD Automation, Documentation & Deployment Readiness
+
+### Agent
+- Model: Gemini 3.8 Flash (High)
+
+### Actions Taken
+1. Created `.github/workflows/ci.yml` defining continuous integration jobs: `backend-pytest`, `web-lint`, `web-type-check`, `web-unit-tests`, `web-build`, and `playwright-e2e`. Configured dependency caching (pip, npm, Playwright browser cache), test-only environment keys, and full local runner isolation (never contacting live Render services).
+2. Rewrote `web/README.md` in plain words detailing the application purpose, required server-side environment variables (`PULSEPAY_API_URL`, `PULSEPAY_API_KEY`), setup/run instructions, testing commands, and known limitations.
+3. Added a dedicated "Web App (Next.js)" section to the root `README.md` including a feature overview, table link, and screenshot placeholder.
+4. Compiled explicit manual deployment checklist for Vercel and Render CORS configuration.
+5. Executed and verified all quality and test suites locally: lint, type-check, unit tests, Next.js build, Playwright E2E, and backend pytest.
+
+### Mistakes & Corrections Log
+1. Attempted running recursive search for `.github` across the repository with PowerShell without excluding `node_modules`, generating an excessively verbose path listing through transitive dependency folders.
+   - *Correction*: Targeted the root directory specifically using `Test-Path .github`.
+
+
 

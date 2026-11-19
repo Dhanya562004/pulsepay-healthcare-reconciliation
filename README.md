@@ -16,6 +16,7 @@
 | Service | Environment | Live URL |
 | :--- | :--- | :--- |
 | **🖥️ Executive Console** | Streamlit Cloud | [**Launch Live Dashboard**](https://pulsepay-healthcare-reconciliation-fpyr9vynfto549zh8mwwhf.streamlit.app/) |
+| **💻 Web App (Operator UI)** | Next.js (Local: `web/`) | [`./web`](./web) |
 | **⚡ REST API Service** | Render | [**https://pulsepay-backend-po8g.onrender.com**](https://pulsepay-backend-po8g.onrender.com) |
 | **📑 Interactive API Docs** | Swagger / OpenAPI | [**https://pulsepay-backend-po8g.onrender.com/docs**](https://pulsepay-backend-po8g.onrender.com/docs) |
 | **📚 Alternate API Specs** | ReDoc | [**https://pulsepay-backend-po8g.onrender.com/redoc**](https://pulsepay-backend-po8g.onrender.com/redoc) |
@@ -48,6 +49,28 @@ The simulation illustrates:
 - 🔍 **5-Rule Financial Reconciliation Engine:** Detects and resolves revenue discrepancies (Overpayments, Unretried Failures, Missing Payments).
 - 🛰️ **Observability Middleware:** Computes execution duration in `ms` and attaches `X-Process-Time` tracing headers to requests.
 - 🎨 **Streamlit Dashboard:** Interactive UI with KPI cards, Webhook Simulator Lab, and audit logs.
+- 💻 **Next.js Web App:** Modern server-rendered operator portal with paginated payments list, detail pages, and webhook timeline tracking.
+
+---
+
+## 💻 Web App (Next.js)
+
+The application includes an operator web portal located in [`web/`](./web), built with Next.js 14 (App Router, TypeScript strict mode) and Tailwind CSS.
+
+### Core Capabilities
+- **Paginated Payments Ledger**: Browse payments with server-driven pagination (`?page=...`) and status filtering (`?status=...`).
+- **Payment Detail & Audit Timeline**: Deep-link to any transaction (`/payments/[id]`) to inspect payment attributes and chronological webhook events (`PROCESSED`, `DUPLICATE_IGNORED`, `DELAYED_IGNORED`).
+- **Secret Isolation**: The backend API key is kept strictly server-side; the client browser never receives or transmits API keys.
+- **Strict Headers & Safe Rendering**: Configured with strict Content Security Policy (CSP), anti-clickjacking headers, and plain-text escaping (no `dangerouslySetInnerHTML`).
+
+### Web App Screenshot
+<!-- Web App Screenshot Placeholder -->
+> **Screenshot Placeholder**
+>
+> *(Screenshot will be placed here upon live deployment)*
+>
+> `![PulsePay Next.js Web App](docs/images/web-app-screenshot.png)`
+
 
 ---
 
