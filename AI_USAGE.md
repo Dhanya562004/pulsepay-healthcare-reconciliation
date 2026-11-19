@@ -58,3 +58,37 @@
 1. The repository root `.gitignore` contained a bare `lib/` pattern originally intended for Python virtual environment folders. This caused Git to ignore `web/lib/`.
    - *Correction*: Added `!lib/` and `!lib/**` to `web/.gitignore` to properly track `web/lib/format.ts`, `web/lib/search-params.ts`, and `web/lib/api.ts` without needing to modify root Python ignore patterns.
 2. An attempt to upgrade Next.js to `^14.2.25` encountered Windows file-lock contention and a transient network ECONNRESET. Next.js 14.2.15 was retained, verified cleanly passing type-check, lint, tests, and production build.
+
+---
+
+## Phase 3: Playwright End-to-End Testing
+
+### Agent
+- Model: Gemini 3.8 Flash (High)
+
+### Actions Taken
+1. Added Playwright (`@playwright/test` and Chromium) to `web/` with single-worker, deterministic, zero-retry configuration in `web/playwright.config.ts`.
+2. Created test backend runner (`web/scripts/start_test_backend.py`) that boots FastAPI on `127.0.0.1:8000` with an isolated temporary SQLite database, a test-only API key (`test-playwright-secret-key-xyz`), and deterministic mock data (15 payments, multi-event webhook timeline, and an XSS probe record).
+3. Configured Playwright's dual `webServer` orchestration to run both the FastAPI test backend and the Next.js production build (`npm run start -- -p 3000`) locally, ensuring complete isolation from production and live Render deployments.
+4. Implemented full E2E test suite in `web/e2e/payments.spec.ts` covering:
+   - Payment list table rows (10 rows on page 1) and pagination controls.
+   - Next page navigation (`?page=2`), URL transition, and updated page rows.
+   - Status filtering narrowing table rows to matching status.
+   - Payment detail view with full metadata and 3-event webhook timeline.
+   - Unknown payment ID rendering HTTP 404 not-found page with return link.
+   - XSS sanitization verifying `<script>alert(1)</script>` renders as plain text without script execution or dialog triggers.
+   - Secret key isolation asserting that the backend `API_KEY` never appears in page HTML source or browser-initiated network requests.
+5. Created `web/README.md` documenting setup, scripts, dual-server testing architecture, and Playwright execution commands.
+
+### Mistakes & Corrections Log
+1. In PowerShell, running `curl -H ...` threw a parameter binding error because `curl` is an alias for `Invoke-WebRequest` in Windows PowerShell.
+   - *Correction*: Invoked `curl.exe` directly to verify local backend HTTP responses.
+2. During the initial `npx playwright install chromium` execution, a transient network TLS reset (`ECONNRESET`) occurred when downloading browser packages from `cdn.playwright.dev`. Playwright's built-in retry logic caught the error and completed the download cleanly on retry.
+3. In `web/e2e/payments.spec.ts`, Playwright strict mode locators `getByText('stripe')` and `getByText('PROCESSED')` matched multiple elements because substring matching caught transaction reference `tx_stripe_detail_001` and event ID `evt_processed_001`.
+   - *Correction*: Specified `{ exact: true }` so locators strictly target the intended badge spans.
+4. Comparing the first table cell text on page 1 vs page 2 compared `"pay-seq-..."` on both pages due to UI ID slicing (`.slice(0, 8)`).
+   - *Correction*: Compared the unique link `href` attribute (`/payments/${id}`) to assert row transition between pagination pages.
+5. `npm run test` (Vitest) attempted to execute Playwright test file `web/e2e/payments.spec.ts` because default Vitest matchers include `**/*.spec.ts`.
+   - *Correction*: Added `exclude: [...configDefaults.exclude, "e2e/**"]` in `web/vitest.config.ts`.
+
+
