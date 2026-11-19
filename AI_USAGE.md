@@ -35,3 +35,26 @@
 ### Mistakes & Corrections Log
 1. In `tests/test_webhooks.py`, the initial test assertion looked for `"DUPLICATE_IGNORED"` in `detail["webhook_event_statuses"]`. However, checking `backend/services/webhook_service.py` confirmed that incoming duplicate webhooks with identical `event_id` are caught early by the idempotency guard and rejected with `{"status": "ignored"}` without creating a second row in `webhook_events` (since `event_id` is unique in SQLite/PostgreSQL).
    - *Correction*: Updated `test_webhooks.py` to assert that the duplicate webhook request returns `status="ignored"` with the idempotency message, and that the payment detail accurately reflects the original processed webhook event.
+
+---
+
+## Phase 2: Next.js Frontend Application (`web/`)
+
+### Agent
+- Model: Gemini 3.8 Flash (High)
+
+### Actions Taken
+1. Initialized Next.js 14 App Router application with TypeScript strict mode enabled in `web/`.
+2. Built server-only API client (`web/lib/api.ts`) utilizing `PULSEPAY_API_URL` and `PULSEPAY_API_KEY` without exposing keys to the browser, with ISR fetch revalidation (30s) on the list and dynamic `cache: 'no-store'` on the detail page.
+3. Implemented `/payments` with server-rendered paginated table driven by URL `searchParams` (`?page=...&status=...`), Zod validation and safe fallbacks, status filtering, accessible keyboard pagination, `loading.tsx`, `error.tsx`, and empty state.
+4. Implemented `/payments/[id]` detail page with full transaction metadata, webhook event timeline, and `notFound()` handling with `not-found.tsx`.
+5. Created `web/lib/format.ts` for consistent currency and timestamp formatting.
+6. Added lazy loading with `next/dynamic` for `StatusBreakdownChart` with loading fallback.
+7. Configured strict security headers (CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy) in `next.config.mjs`.
+8. Added Vitest unit test suite (17 tests) covering formatters and search parameter validation.
+9. Verified lint, type-check, unit tests, and production build with real bundle sizes.
+
+### Mistakes & Corrections Log
+1. The repository root `.gitignore` contained a bare `lib/` pattern originally intended for Python virtual environment folders. This caused Git to ignore `web/lib/`.
+   - *Correction*: Added `!lib/` and `!lib/**` to `web/.gitignore` to properly track `web/lib/format.ts`, `web/lib/search-params.ts`, and `web/lib/api.ts` without needing to modify root Python ignore patterns.
+2. An attempt to upgrade Next.js to `^14.2.25` encountered Windows file-lock contention and a transient network ECONNRESET. Next.js 14.2.15 was retained, verified cleanly passing type-check, lint, tests, and production build.
